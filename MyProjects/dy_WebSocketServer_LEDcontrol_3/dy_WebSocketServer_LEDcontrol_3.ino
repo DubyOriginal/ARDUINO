@@ -22,7 +22,7 @@
 #define serial Serial
 
 //WiFi
-const char *ssid = "TestNet";
+const char *ssid = "ProkletaKurva";
 const char *password = "testnet123";
 
 ESP8266WebServer server = ESP8266WebServer(80);
