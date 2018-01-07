@@ -1,6 +1,7 @@
 /*
 * ESP8266 WiFi - Monitoring sensors
  *   Created on: 17.09.2017
+ *   updated on: 07.01.2018
  *   by DubyOriginal
  *  
  * ---------------------------------------------------------  
@@ -58,7 +59,7 @@ float sensor_CKP_POL = 0.1;
 
 //OTHER
 #define serial Serial
-#define PIN_ONE_WIRE_BUS 2  //D4 -> gpio 2 
+#define PIN_ONE_WIRE_BUS 2  //D4 -> 2 
 #define PIN_REL_CKP 16      //D0 -> 16
 #define PIN_REL_RAD 5       //D1 -> 5
 #define PIN_DETECT_CKP 4    //D2 -> 4
@@ -91,7 +92,7 @@ void setup() {
   //init WiFi 
   //----------------------------------------------------------
   WiFi.begin (ssid, password);
-  WiFi.mode(WIFI_STA);
+  WiFi.mode(WIFI_STA);    //dissable wifi hotspot
   while ( WiFi.status() != WL_CONNECTED ) {
     delay ( 500 ); 
     serial.print ( "." );
@@ -101,10 +102,6 @@ void setup() {
   serial.print("device IP address: "); 
   serial.println(WiFi.localIP()); 
   serial.println("----------------------------------------------------------------------------------");
-
-
-  //  test
-  //----------------------------------------------------------
 
 }
 
@@ -132,9 +129,8 @@ void preparePINS() {
   109 -> 28 ff b8 1c 31 17 04 85  - S10 - soba
   110 -> 28 ff 67 b6 30 17 04 ad  - S11 - vani
 
-  109 -> 28 ff 67 b6 30 17 04 ad  - nema
-  107 -> 28 ff 75 1f 31 17 03 40  - nema
-  200 -> 10 e3 c4 71 01 08 00 4c - S10 - soba
+  200 -> "00 ff" - 230V detector - CKP PUMP
+  201 -> "02 ff" - 230V detector - RAD PUMP
 */
 
 void defineDeviceSensors(){
@@ -192,13 +188,13 @@ void calculateDHT11Vals(float rawTemp, float rawHum){
   float hic = dht.computeHeatIndex(rawTemp, rawHum, false);       
   serial.println("calculateDHT11Vals -> " + String(hic));
 }
-*/
 
 float readSensorDS18ByIndex(int index){    //DeviceAddress deviceAddress){     
    float tempVal = DS18B20.getTempCByIndex(index);
    Serial.println("readSensorDS18ByIndex[" + String(index) + "] " + String(tempVal));
    return tempVal;
 }
+*/
 
 
 float readSensorDS18ByDeviceAddress(DeviceAddress deviceAddress){   
@@ -216,7 +212,7 @@ void readSensors(){
   serial.println("readSensors");
   DS18B20.requestTemperatures();
 
-  // DS1820
+  // read temp sensors -> DS1820
   //-------------------------------------------------------------------------
   float sensVal = 0;
   for (int i=0; i < tempSensorCnt; i++){
@@ -247,17 +243,17 @@ void runController(){
 
   //PUMP_RAD
   //---------------------------------
-  serial.println("TEST: PUMP_ON_TEMP -> " + String(PUMP_ON_TEMP));
-  serial.println("TEST: sensor_PUFF_4 -> " + String(sensor_PUFF_4));
+  //serial.println("TEST: PUMP_ON_TEMP -> " + String(PUMP_ON_TEMP));
+  //serial.println("TEST: sensor_PUFF_4 -> " + String(sensor_PUFF_4));
   if (sensor_PUFF_4 > PUMP_ON_TEMP){
     PUMP_RAD = HIGH;
     digitalWrite(PIN_REL_RAD, HIGH);    //1 HIGH -> Rellay: INACTIVE (OFF) -> PUMP ON 
-    serial.println("PUMP_RAD -> HIGH");
+    //serial.println("PUMP_RAD -> HIGH");
     
   }else{
     PUMP_RAD = LOW;
     digitalWrite(PIN_REL_RAD, LOW);     //0 LOW  -> Rellay: ACTIVE (ON)    -> PUMP OFF
-    serial.println("PUMP_RAD -> LOW");
+    //serial.println("PUMP_RAD -> LOW");
   }
 
   //PUMP_CKP
@@ -280,6 +276,9 @@ void runController(){
   serial.println("DETECT_CKP: " + sensorsArr[11].sensor_value);
   serial.println("DETECT_RAD: " + sensorsArr[12].sensor_value);
 }
+
+//******************************************************************************************************************************
+//CONNECTION PROTOCOL
 
 // Open connection to the HTTP server
 bool connect(const char* hostName, unsigned port) {
@@ -311,6 +310,38 @@ bool sendRequest(const char* host, const char* route) {
   return true;
 }
 
+// Skip HTTP headers so that we are at the beginning of the response's body
+bool skipResponseHeaders() {
+  // HTTP headers end with an empty line
+  char endOfHeaders[] = "\r\n\r\n";
+
+  client.setTimeout(HTTP_TIMEOUT);
+  bool ok = client.find(endOfHeaders);
+
+  if (!ok) {
+    Serial.println("No response or invalid response!");
+  }
+
+  return ok;
+}
+
+void readReponseContent() {
+    // if there are incoming bytes available from the server, read them and print them:
+  //while (client.available()) {
+   // char response = client.read();
+   // serial.println("server response: " + response);
+  //}
+}
+
+// Close the connection with the HTTP server
+void disconnect() {
+  Serial.println("Disconnect");
+  client.stop();
+}
+
+
+//******************************************************************************************************************************
+//other functions
   /*{
    "sensors":[{"sensor_id":"101","sensor_value":"11.33"},{"sensor_id":"102","sensor_type":"hum","sensor_value":"22.33"}],
    "status":{"PUMP_CKP":"1","PUMP_RAD":"0"},
@@ -345,35 +376,6 @@ String getStatusJson(){
   return jsonStr;  
 }*/
 
-
-// Skip HTTP headers so that we are at the beginning of the response's body
-bool skipResponseHeaders() {
-  // HTTP headers end with an empty line
-  char endOfHeaders[] = "\r\n\r\n";
-
-  client.setTimeout(HTTP_TIMEOUT);
-  bool ok = client.find(endOfHeaders);
-
-  if (!ok) {
-    Serial.println("No response or invalid response!");
-  }
-
-  return ok;
-}
-
-void readReponseContent() {
-    // if there are incoming bytes available from the server, read them and print them:
-  //while (client.available()) {
-   // char response = client.read();
-   // serial.println("server response: " + response);
-  //}
-}
-
-// Close the connection with the HTTP server
-void disconnect() {
-  Serial.println("Disconnect");
-  client.stop();
-}
 
 // Pause for a 1 minute
 void wait() {
